@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jazz Chord Lab</title>
+<meta name="description" content="Tapez une grille d'accords de jazz : écoutez-la au piano avec de vrais voicings sans fondamentale, voyez les notes sur le clavier et explorez les substitutions.">
+<style>
+:root{--bg:#121019;--panel:#1b1826;--ink:#f3ede4;--muted:#a79fb4;--line:#2e2940;--gold:#e9b949;--teal:#4fd1c5;--rose:#f472b6;--white:#f7f3ea;--black:#1a1720}
+@media (prefers-color-scheme:light){:root{--bg:#f7f3ea;--panel:#fffdf8;--ink:#1f1a24;--muted:#6b6275;--line:#e3dccd;--gold:#b7860b;--teal:#0f766e;--rose:#be185d;--white:#fffdf8;--black:#22202a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:0 16px}
+header{padding:26px 0 6px}
+h1{margin:0;font-family:Georgia,"Times New Roman",serif;font-size:34px;letter-spacing:-.01em}h1 em{color:var(--gold)}
+.lead{color:var(--muted);margin:4px 0 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:14px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+select,input,textarea{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-height:42px}
+textarea{width:100%;min-height:64px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px}
+.btn{font:inherit;font-weight:700;border:0;border-radius:999px;padding:10px 20px;min-height:44px;background:var(--gold);color:#1b1306;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+#chords{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{font:inherit;cursor:pointer;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-width:84px;text-align:left}
+.chip b{display:block;font-family:Georgia,serif;font-size:20px}
+.chip small{color:var(--muted);font-size:12px}
+.chip.sel{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset}
+.chip.play{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
+#kb{width:100%;height:auto;display:block;margin-top:6px}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:6px}
+.detail h3{margin:0 0 4px;font-family:Georgia,serif;font-size:24px}
+.notes{font-family:ui-monospace,Menlo,monospace;color:var(--teal)}
+.idea{border-top:1px solid var(--line);padding:10px 0}
+.idea:first-child{border-top:0}
+.idea b{color:var(--gold)}
+.idea p{margin:2px 0 6px;color:var(--muted);font-size:14px}
+.err{color:var(--rose);margin-top:8px}
+footer{color:var(--muted);font-size:13px;padding:6px 0 40px}footer a{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Jazz Chord <em>Lab</em></h1>
+    <p class="lead">Tapez une grille, écoutez-la au piano avec de vrais voicings de jazz, et essayez des substitutions.</p>
+  </header>
+
+  <div class="card">
+    <div class="row">
+      <label style="flex:1 1 260px">Grille prête à l'emploi<select id="preset"></select></label>
+      <label>Tempo<input id="tempo" type="number" min="40" max="240" value="120" style="width:90px"></label>
+      <label>Temps par accord<select id="beats"><option value="2">2</option><option value="4" selected>4</option></select></label>
+    </div>
+    <label style="margin-top:10px">Grille (accords séparés par des espaces ou des barres)<textarea id="grid" spellcheck="false"></textarea></label>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="play" type="button">▶ Jouer</button>
+      <button class="btn ghost" id="stop" type="button">■ Stop</button>
+      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="loop" checked style="min-height:auto"> En boucle</label>
+      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="swing" checked style="min-height:auto"> Basse marchée</label>
+    </div>
+    <div id="err" class="err" role="alert"></div>
+    <div id="chords"></div>
+  </div>
+
+  <div class="card">
+    <svg id="kb" viewBox="0 0 1008 130" role="img" aria-label="Clavier de piano montrant les notes de l'accord"></svg>
+    <div class="legend"><span><i class="dot" style="background:var(--rose)"></i>Basse (main gauche)</span><span><i class="dot" style="background:var(--teal)"></i>Voicing main droite</span><span><i class="dot" style="background:var(--gold)"></i>Notes guides (3ce et 7e)</span></div>
+  </div>
+
+  <div class="card detail" id="detail"></div>
+
+  <footer>Créé par <a href="https://github.com/t800lostinhumanity-svg">Antoine Ricci</a>, pianiste de jazz (nom de scène Sarkis Ricci) devenu technicien systèmes et réseaux. Code source sur <a href="https://github.com/t800lostinhumanity-svg/jazz-chord-lab">GitHub</a>. Le son est synthétisé dans votre navigateur.</footer>
+</div>
+
+<script src="theory.js"></script>
+<script>
+(function () {
+  'use strict';
+  const T = window.Theory, $ = id => document.getElementById(id);
+  let voiced = [], selected = 0, timer = null, step = 0, ctx = null;
+
+  // ---------- keyboard (C2 = 36 .. B5 = 83) ----------
+  const FIRST = 36, LAST = 83, WW = 1008 / 28;
+  const isBlack = m => [1, 3, 6, 8, 10].includes(m % 12);
+  const keys = {};
+  (function drawKeyboard() {
+    let w = 0, html = '';
+    const whites = [], blacks = [];
+    for (let m = FIRST; m <= LAST; m++) {
+      if (!isBlack(m)) { whites.push(`<rect data-m="${m}" x="${w * WW}" y="0" width="${WW - 1}" height="128" rx="4" fill="var(--white)" stroke="var(--line)"/>`); w++; }
+      else blacks.push(`<rect data-m="${m}" x="${w * WW - WW * 0.32}" y="0" width="${WW * 0.64}" height="80" rx="3" fill="var(--black)"/>`);
+    }
+    html = whites.join('') + blacks.join('');
+    for (let o = 0; o < 4; o++) html += `<text x="${o * 7 * WW + 4}" y="122" font-size="11" fill="#8a8299">C${o + 2}</text>`;
+    $('kb').innerHTML = html;
+    $('kb').querySelectorAll('rect').forEach(r => keys[r.dataset.m] = r);
+  })();
+  function paint(v) {
+    for (const m in keys) keys[m].setAttribute('fill', isBlack(+m) ? 'var(--black)' : 'var(--white)');
+    if (!v) return;
+    const guides = [v.chord.tones[1], v.chord.tones[3]].filter(x => x !== undefined).map(i => (v.chord.root + i) % 12);
+    keys[v.bass] && keys[v.bass].setAttribute('fill', 'var(--rose)');
+    v.right.forEach(m => keys[m] && keys[m].setAttribute('fill', guides.includes(m % 12) ? 'var(--gold)' : 'var(--teal)'));
+  }
+
+  // ---------- sound: a simple electric-piano-like synth ----------
+  function audio() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); return ctx; }
+  function note(midi, when, dur, vel) {
+    const a = audio(), f = 440 * Math.pow(2, (midi - 69) / 12);
+    const g = a.createGain(); g.connect(a.destination);
+    g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(vel, when + 0.01);
+    g.gain.exponentialRampToValueAtTime(vel * 0.35, when + 0.4); g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    [[1, 'sine', 1], [2, 'sine', 0.35], [3, 'triangle', 0.08]].forEach(([mul, type, amp]) => {
+      const o = a.createOscillator(), og = a.createGain(); o.type = type; o.frequency.value = f * mul; og.gain.value = amp;
+      o.connect(og); og.connect(g); o.start(when); o.stop(when + dur + 0.05);
+    });
+  }
+  function playChord(v, when, beatLen, beats) {
+    v.right.forEach(m => note(m, when, beatLen * beats * 0.95, 0.09));
+    if ($('swing').checked) {
+      // simple walking bass: root, 3rd/5th, approach note to the next chord
+      const next = voiced[(voiced.indexOf(v) + 1) % voiced.length];
+      const line = [v.bass, v.bass + (v.chord.tones[2] || 7), v.bass + (v.chord.tones[1] || 4), (next ? next.bass : v.bass) + (Math.random() < .5 ? 1 : -1)];
+      for (let b = 0; b < beats; b++) note(line[Math.round(b * 4 / beats)] - (b === 0 ? 0 : 0), when + b * beatLen, beatLen * 0.9, 0.16);
+    } else note(v.bass, when, beatLen * beats * 0.9, 0.16);
+  }
+
+  // ---------- UI ----------
+  function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+  function parseGrid() { return $('grid').value.split(/[\s|]+/).filter(Boolean); }
+  function build() {
+    $('err').textContent = '';
+    try { voiced = T.voiceProgression(parseGrid()); }
+    catch (e) { $('err').textContent = e.message; voiced = []; }
+    if (selected >= voiced.length) selected = 0;
+    $('chords').innerHTML = voiced.map((v, i) => `<button type="button" class="chip${i === selected ? ' sel' : ''}" data-i="${i}"><b>${esc(v.chord.symbol)}</b><small>${v.chord.label} · forme ${v.form}</small></button>`).join('');
+    show(selected);
+  }
+  function show(i) {
+    selected = i;
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('sel', +c.dataset.i === i));
+    const v = voiced[i]; paint(v);
+    if (!v) { $('detail').innerHTML = ''; return; }
+    const next = voiced[i + 1] && voiced[i + 1].chord.symbol;
+    const ideas = T.substitutions(v.chord.symbol, next);
+    $('detail').innerHTML = `<h3>${esc(v.chord.symbol)}</h3>
+      <div>${v.chord.label} · voicing sans fondamentale, forme ${v.form} · <span class="notes">${v.right.map(m => T.midiName(m, v.chord.flats)).join(' ')}</span> · basse <span class="notes">${T.midiName(v.bass, v.chord.flats)}</span></div>
+      <p style="color:var(--muted);font-size:14px">La main gauche joue la fondamentale, la main droite garde les notes qui font la couleur (3ce, 7e, extensions). D'un accord à l'autre, le voicing choisi est celui qui bouge le moins.</p>
+      <h4 style="margin:14px 0 4px">Idées de réharmonisation</h4>`
+      + (ideas.length ? ideas.map((x, k) => `<div class="idea"><b>${esc(x.name)}</b> → <span class="notes">${x.chords.map(esc).join(' ')}</span><p>${esc(x.why)}</p><button class="btn ghost" type="button" data-apply="${k}">Appliquer et écouter</button></div>`).join('') : '<p style="color:var(--muted)">Pas de suggestion pour cet accord.</p>');
+    $('detail').querySelectorAll('[data-apply]').forEach(b => b.addEventListener('click', () => {
+      const list = parseGrid(); list.splice(i, 1, ...ideas[+b.dataset.apply].chords);
+      $('grid').value = list.join(' '); build(); show(i); stop(); playOne(i);
+    }));
+  }
+  function playOne(i) { const a = audio(); const bl = 60 / +$('tempo').value; playChord(voiced[i], a.currentTime + 0.05, bl, +$('beats').value); }
+  $('chords').addEventListener('click', e => { const c = e.target.closest('.chip'); if (!c) return; show(+c.dataset.i); playOne(+c.dataset.i); });
+
+  function stop() { clearTimeout(timer); timer = null; document.querySelectorAll('.chip').forEach(c => c.classList.remove('play')); }
+  function play() {
+    stop(); if (!voiced.length) return; audio(); step = 0;
+    const tick = () => {
+      if (step >= voiced.length) { if (!$('loop').checked) return stop(); step = 0; }
+      const bl = 60 / +$('tempo').value, beats = +$('beats').value;
+      playChord(voiced[step], ctx.currentTime + 0.05, bl, beats);
+      document.querySelectorAll('.chip').forEach(c => c.classList.toggle('play', +c.dataset.i === step));
+      paint(voiced[step]); step++;
+      timer = setTimeout(tick, bl * beats * 1000);
+    };
+    tick();
+  }
+  $('play').addEventListener('click', play); $('stop').addEventListener('click', () => { stop(); paint(voiced[selected]); });
+  $('grid').addEventListener('input', () => { stop(); build(); });
+
+  $('preset').innerHTML = Object.keys(T.PRESETS).map(k => `<option>${esc(k)}</option>`).join('');
+  $('preset').addEventListener('change', () => { $('grid').value = T.PRESETS[$('preset').value].join(' '); selected = 0; stop(); build(); });
+  $('grid').value = T.PRESETS[Object.keys(T.PRESETS)[0]].join(' ');
+  build();
+})();
+</script>
+</body>
+</html>
